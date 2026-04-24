@@ -39,6 +39,8 @@ dependencies:
   path: ^1.9.1
   image_picker: ^1.2.1
   flutter_image_compress: ^2.4.0
+  geolocator: ^14.0.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

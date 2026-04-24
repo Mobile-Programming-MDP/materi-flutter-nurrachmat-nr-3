@@ -3,14 +3,17 @@ import 'package:notes/models/note.dart';
 
 class NoteService {
   static final FirebaseFirestore _database = FirebaseFirestore.instance;
-  static final CollectionReference _notesCollection =
-      _database.collection('notes');
+  static final CollectionReference _notesCollection = _database.collection(
+    'notes',
+  );
 
   static Future<void> addNote(Note note) async {
     Map<String, dynamic> newNote = {
       'title': note.title,
       'description': note.description,
       'image_base_64': note.imageBase64,
+      'latitude': note.latitude,
+      'longitude': note.longitude,
       'created_at': FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };
@@ -22,6 +25,8 @@ class NoteService {
       'title': note.title,
       'description': note.description,
       'image_base_64': note.imageBase64,
+      'latitude': note.latitude,
+      'longitude': note.longitude,
       'created_at': note.createdAt,
       'updated_at': FieldValue.serverTimestamp(),
     };
@@ -52,6 +57,8 @@ class NoteService {
           updatedAt: data['updated_at'] != null
               ? data['updated_at'] as Timestamp
               : null,
+          latitude: data['latitude'],
+          longitude: data['longitude'],
         );
       }).toList();
     });
