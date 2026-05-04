@@ -31,6 +31,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
     ];
   }
   String? _category;
+   bool _isSubmitting = false;
+  bool _isGettingLocation = false;
 
   //1.Fungsi pick, compress and convert Image
   Future<void> pickImageAndConvert() async {
@@ -116,7 +118,46 @@ class _AddPostScreenState extends State<AddPostScreen> {
     );
   }
 
-  //4. Fungsi submit Post
+   //4. Fungsi Widget tampil gambar
+  Widget _buildImagePreview() {
+    if (_base64Image == null) {
+      return Container(
+        height: 180,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade400),
+        ),
+        child: const Text('Belum ada gambar dipilih'),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.memory(
+        base64Decode(_base64Image!),
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+
+  //5. Fungsi Widget tampil lokasi
+  Widget _buildLocationInfo() {
+    if (_latitude == null || _longitude == null) {
+      return const Text('Lokasi belum diambil');
+    }
+
+    return Text(
+      'Lat: $_latitude\nLng: $_longitude',
+      textAlign: TextAlign.center,
+    );
+  }
+
+  //6. Fungsi submit Post
   Future<void> _submitPost() async {
     if(_base64Image == null || _descriptionController.text.isEmpty){
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,43 +192,58 @@ class _AddPostScreenState extends State<AddPostScreen> {
     }
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Add new post"),
-      ),
+      appBar: AppBar(title: Text("Add new post")),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextButton(
-              //onPressed: _showImageSourceDialog,
-              onPressed: pickImageAndConvert,
+            _buildImagePreview(),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: _isSubmitting ? null : pickImageAndConvert,
               child: const Text('Pick Image'),
             ),
-            SizedBox(height: 16,),
-            TextButton(
-              //onPressed: _showImageSourceDialog,
-              onPressed: _showCategorySelect,
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: _isSubmitting ? null : _showCategorySelect,
               child: const Text('Select Category'),
             ),
-            Text(_category!),
-            // GestureDetector(
-            //   onTap: _showCategorySelect,
-            //   child: Chip(
-            //     label: Row(
-            //       children: [
-            //         Text(_category!),
-            //         Icon(Icons.edit, size: 16,)
-            //       ],
-            //     )
-            //   ),
-            // )
+            const SizedBox(height: 8),
+            Text(
+              _category ?? 'Belum memilih kategori',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descriptionController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                labelText: 'Deskripsi',
+                hintText: 'Masukkan deskripsi laporan',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: (_isSubmitting || _isGettingLocation)
+                  ? null
+                  : _getLocation,
+              child: Text(
+                _isGettingLocation ? 'Mengambil Lokasi...' : 'Get Location',
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLocationInfo(),
+            const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _submitPost, 
-              child: Text("Submit")
-              )
+              onPressed: _isSubmitting ? null : _submitPost,
+              child: Text(_isSubmitting ? 'Submitting...' : 'Submit'),
+            ),
           ],
         ),
       ),
