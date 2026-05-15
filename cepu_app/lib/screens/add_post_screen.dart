@@ -183,6 +183,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
           fullName: fullName,
         ),
       ).whenComplete(() {
+        sendNotificationToTopic(_descriptionController.text, fullName!);
         Navigator.of(context).pop();
       });
       ScaffoldMessenger.of(
@@ -266,6 +267,37 @@ class _AddPostScreenState extends State<AddPostScreen> {
     }
   }
 
+
+  Future<void> sendNotificationToTopic(String body, String senderName) async {
+    final url = Uri.parse('https://cepu-cloud-if.vercel.app/send-to-topic');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({
+        "topic": "berita-fasum",
+        "title": "🔔 Laporan Baru",
+        "body": body,
+        "senderName": senderName,
+        "senderPhotoUrl": "https://static.vecteezy.com/system/resources/thumbnails/041/642/167/small_2x/ai-generated-portrait-of-handsome-smiling-young-man-with-folded-arms-isolated-free-png.png",
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Notofikasi berhasil dikirim")),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Notifikasi gagal dikirim")),
+        );
+      }
+    }
+  }
   @override
   void dispose() {
     // TODO: implement dispose
