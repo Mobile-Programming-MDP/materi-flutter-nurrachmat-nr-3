@@ -14,7 +14,7 @@ import 'package:http/http.dart' as http;
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 const String webVapidKey =
-  'BGMKDC2IU-0MZoAZWoKXrCWJXwmz2prRToS4phVQCvzfm35aUZzslKtaL6ROBCGXQjV2Vo0KOgY1bde5temaLSo';
+    'BGMKDC2IU-0MZoAZWoKXrCWJXwmz2prRToS4phVQCvzfm35aUZzslKtaL6ROBCGXQjV2Vo0KOgY1bde5temaLSo';
 
 Future<void> requestNotificationPermission() async {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -44,7 +44,7 @@ Future<void> showBasicNotification(String? title, String? body) async {
   );
   final platform = NotificationDetails(android: android);
   await flutterLocalNotificationsPlugin.show(
-    id: 0,
+    id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
     title: title,
     body: body,
     notificationDetails: platform,
@@ -65,7 +65,7 @@ Future<void> showNotificationFromData(Map<String, dynamic> data) async {
       largeIconBitmap = ByteArrayAndroidBitmap.fromBase64String(base64);
     }
   }
-  //pilih salah satu
+
   final styleInfo = largeIconBitmap != null
       ? BigPictureStyleInformation(
           largeIconBitmap,
@@ -79,16 +79,11 @@ Future<void> showNotificationFromData(Map<String, dynamic> data) async {
           contentTitle: title,
         );
 
-  final simpleStyleInfo = BigTextStyleInformation(
-    '$body\n\nDari: $sender\nWaktu: $time',
-    contentTitle: title,
-  );
-
   final androidDetails = AndroidNotificationDetails(
     'detailed_channel',
     'Notifikasi Detail',
     channelDescription: 'Notifikasi dengan detail tambahan',
-    styleInformation: simpleStyleInfo,
+    styleInformation: styleInfo,
     largeIcon: largeIconBitmap,
     importance: Importance.max,
     priority: Priority.max,
@@ -96,7 +91,7 @@ Future<void> showNotificationFromData(Map<String, dynamic> data) async {
 
   final platform = NotificationDetails(android: androidDetails);
   await flutterLocalNotificationsPlugin.show(
-    id: 0,
+    id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
     title: title,
     body: body,
     notificationDetails: platform,
@@ -115,9 +110,11 @@ Future<String?> _networkImageToBase64(String url) async {
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('Handling background message: ${message.messageId}');
+
   if (message.data.isNotEmpty) {
     await showNotificationFromData(message.data);
-  } else {
+  } else if (message.notification != null) {
     await showBasicNotification(
       message.notification!.title,
       message.notification!.body,
@@ -137,11 +134,41 @@ void main() async {
   if (!kIsWeb) {
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    final InitializationSettings settings = InitializationSettings(
+    const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const InitializationSettings settings = InitializationSettings(
       android: androidInit,
-      iOS: DarwinInitializationSettings(),
+      iOS: iosInit,
     );
     await flutterLocalNotificationsPlugin.initialize(settings: settings);
+
+    // Create notification channels for Android
+    const AndroidNotificationChannel defaultChannel =
+        AndroidNotificationChannel(
+          'default_channel',
+          'Notifikasi Default',
+          description: 'Notifikasi masuk dari FCM',
+          importance: Importance.high,
+        );
+
+    const AndroidNotificationChannel detailedChannel =
+        AndroidNotificationChannel(
+          'detailed_channel',
+          'Notifikasi Detail',
+          description: 'Notifikasi dengan detail tambahan',
+          importance: Importance.max,
+        );
+
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    await androidPlugin?.createNotificationChannel(defaultChannel);
+    await androidPlugin?.createNotificationChannel(detailedChannel);
   }
   runApp(const MyApp());
 }
@@ -175,12 +202,18 @@ class _MyAppState extends State<MyApp> {
         setState(() {
           status = "Gagal mendapatkan token FCM";
         });
+        return;
+      } else {
+        setState(() {
+          status = "Token FCM berhasil didapatkan";
+        });
       }
     } catch (e) {
       setState(() {
         status = "Error token FCM: $e";
       });
       debugPrint("Error getToken: $e");
+      return;
     }
 
     messaging.onTokenRefresh.listen((token) {
@@ -188,10 +221,18 @@ class _MyAppState extends State<MyApp> {
     });
 
     if (!kIsWeb) {
-      await messaging.subscribeToTopic(topic);
-      setState(() {
-        status = "Subscribe to topic $topic";
-      });
+      try {
+        await messaging.subscribeToTopic(topic);
+        setState(() {
+          status = "Subscribe to topic: $topic";
+        });
+        debugPrint("Subscribed to topic: $topic");
+      } catch (e) {
+        setState(() {
+          status = "Error subscribe topic: $e";
+        });
+        debugPrint("Error subscribing to topic: $e");
+      }
     } else {
       setState(() {
         status = "Web siap menerima notifikasi";
@@ -199,13 +240,21 @@ class _MyAppState extends State<MyApp> {
     }
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (message.data.isNotEmpty) {
-        showNotificationFromData(message.data);
+      debugPrint('Received foreground message: ${message.messageId}');
+
+      if (kIsWeb) {
+        // For web, just log the message - browser handles notifications
+        debugPrint('Web notification: ${message.notification?.title}');
       } else {
-        showBasicNotification(
-          message.notification!.title,
-          message.notification!.body,
-        );
+        // For Android/iOS, show local notification
+        if (message.data.isNotEmpty) {
+          showNotificationFromData(message.data);
+        } else if (message.notification != null) {
+          showBasicNotification(
+            message.notification!.title,
+            message.notification!.body,
+          );
+        }
       }
     });
   }
